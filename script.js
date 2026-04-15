@@ -215,6 +215,41 @@ function shakeCard(playerKey, handIdx) {
     }
 }
 
+function animateFlight(sourceEl, targetEl, card) {
+    if (!sourceEl || !targetEl || !card) return;
+    const sourceRect = sourceEl.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    
+    const ghostSlot = document.createElement('div');
+    ghostSlot.style.position = 'fixed';
+    ghostSlot.style.left = `${sourceRect.left}px`;
+    ghostSlot.style.top = `${sourceRect.top}px`;
+    ghostSlot.style.width = `${sourceRect.width}px`;
+    ghostSlot.style.height = `${sourceRect.height}px`;
+    ghostSlot.style.zIndex = 1000;
+    ghostSlot.style.pointerEvents = 'none';
+    ghostSlot.style.transition = 'all 0.15s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    ghostSlot.style.transformOrigin = 'center center';
+    
+    const ghostCard = renderCard(card, false, 0);
+    ghostSlot.appendChild(ghostCard);
+    document.body.appendChild(ghostSlot);
+    
+    // リフロー
+    void ghostSlot.offsetWidth;
+    
+    const scaleX = targetRect.width / sourceRect.width;
+    const scaleY = targetRect.height / sourceRect.height;
+    
+    ghostSlot.style.left = `${targetRect.left + (targetRect.width - sourceRect.width)/2}px`;
+    ghostSlot.style.top = `${targetRect.top + (targetRect.height - sourceRect.height)/2}px`;
+    ghostSlot.style.transform = `scale(${scaleX}, ${scaleY})`;
+    
+    setTimeout(() => {
+        if(ghostSlot.parentNode) ghostSlot.parentNode.removeChild(ghostSlot);
+    }, 150);
+}
+
 function playCard(playerKey, handIdx) {
     if (!state.isPlaying) return false;
 
@@ -242,6 +277,11 @@ function playCard(playerKey, handIdx) {
     if (targetCenterIdx !== -1) {
         // 出せる: 重なっている場合はスタックにあるカードを全てまとめて出す
         const cardsToPlay = handStack.splice(0, handStack.length);
+        
+        if (cardsToPlay.length > 0) {
+            animateFlight(domHands[playerKey][handIdx], domCenters[targetCenterIdx], cardsToPlay[cardsToPlay.length - 1]);
+        }
+        
         state.center[targetCenterIdx].push(...cardsToPlay);
         state.lastCenterUpdateTime = Date.now();
         
@@ -437,6 +477,11 @@ function cpuAction() {
                     if (canPlay(topCard.rank, cCard.rank)) {
                         // 出せる: まとめて出す
                         const cardsToPlay = hStack.splice(0, hStack.length);
+                        
+                        if (cardsToPlay.length > 0) {
+                            animateFlight(domHands.cpu[hIdx], domCenters[cIdx], cardsToPlay[cardsToPlay.length - 1]);
+                        }
+                        
                         state.center[cIdx].push(...cardsToPlay);
                         state.lastCenterUpdateTime = Date.now();
                         
