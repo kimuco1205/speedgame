@@ -19,7 +19,8 @@ const state = {
     cpuTimer: null,
     stuckCheckTimer: null,
     stuckCountdownInterval: null,
-    isStuckResolving: false
+    isStuckResolving: false,
+    lastCenterUpdateTime: 0
 };
 
 // --- DOM Elements ---
@@ -200,13 +201,30 @@ async function fillHandSlot(playerKey, slotIdx) {
     pState.isDrawing[slotIdx] = false;
 }
 
+function shakeCard(playerKey, handIdx) {
+    const handEl = domHands[playerKey][handIdx];
+    if (handEl) {
+        handEl.classList.remove('card-shake');
+        void handEl.offsetWidth; // リフローしてアニメーションをリセット
+        handEl.classList.add('card-shake');
+        setTimeout(() => {
+            if (handEl.classList.contains('card-shake')) {
+                handEl.classList.remove('card-shake');
+            }
+        }, 400);
+    }
+}
+
 function playCard(playerKey, handIdx) {
     if (!state.isPlaying) return false;
 
     const pState = state[playerKey];
     
     // ペナルティチェック
-    if (Date.now() < pState.penaltyUntil) return false;
+    if (Date.now() < pState.penaltyUntil) {
+        if (playerKey === 'player') shakeCard(playerKey, handIdx);
+        return false;
+    }
 
     const handStack = pState.hand[handIdx];
     if (handStack.length === 0 || pState.isDrawing[handIdx]) return false;
@@ -225,6 +243,7 @@ function playCard(playerKey, handIdx) {
         // 出せる: 重なっている場合はスタックにあるカードを全てまとめて出す
         const cardsToPlay = handStack.splice(0, handStack.length);
         state.center[targetCenterIdx].push(...cardsToPlay);
+        state.lastCenterUpdateTime = Date.now();
         
         // 空になったら補充
         if (handStack.length === 0) {
@@ -238,8 +257,14 @@ function playCard(playerKey, handIdx) {
         state.stuckCheckTimer = setTimeout(checkStuck, 1500); 
         return true;
     } else {
-        // 出せないのにタップした -> ペナルティ
+        // 出せないのにタップした
         if (playerKey === 'player') {
+            shakeCard(playerKey, handIdx);
+            
+            // 直前(500ms以内)に場が更新されていた場合、タッチ負けとみなしペナルティを免除
+            if (Date.now() - state.lastCenterUpdateTime < 500) {
+                return false;
+            }
             applyPenalty('player');
         }
         return false;
@@ -413,6 +438,7 @@ function cpuAction() {
                         // 出せる: まとめて出す
                         const cardsToPlay = hStack.splice(0, hStack.length);
                         state.center[cIdx].push(...cardsToPlay);
+                        state.lastCenterUpdateTime = Date.now();
                         
                         if (hStack.length === 0) fillHandSlot('cpu', hIdx);
                         updateUI();
