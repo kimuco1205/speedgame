@@ -248,14 +248,14 @@ function playCard(playerKey, handIdx) {
 
 function applyPenalty(playerKey) {
     const pState = state[playerKey];
-    pState.penaltyUntil = Date.now() + 5000;
+    pState.penaltyUntil = Date.now() + 3000;
     
     const overlay = playerKey === 'player' ? playerPenaltyOverlay : cpuPenaltyOverlay;
     const timeSpan = overlay.querySelector('.penalty-time');
     overlay.classList.remove('hidden');
     overlay.classList.add('penalty-lock');
     
-    let timeLeft = 5;
+    let timeLeft = 3;
     timeSpan.textContent = timeLeft;
     
     const interval = setInterval(() => {
