@@ -5,14 +5,14 @@ const state = {
     isPlaying: false,
     player: {
         deck: [],
-        hand: [[], []],
-        isDrawing: [false, false],
+        hand: [[], [], []],
+        isDrawing: [false, false, false],
         penaltyUntil: 0
     },
     cpu: {
         deck: [],
-        hand: [[], []],
-        isDrawing: [false, false],
+        hand: [[], [], []],
+        isDrawing: [false, false, false],
         penaltyUntil: 0
     },
     center: [[], []], // 中央の場2枠
@@ -39,8 +39,8 @@ const domPlayerDeckCount = document.getElementById('player-deck-count');
 const domCpuDeckCount = document.getElementById('cpu-deck-count');
 
 const domHands = {
-    player: [document.getElementById('player-hand-0'), document.getElementById('player-hand-1')],
-    cpu: [document.getElementById('cpu-hand-0'), document.getElementById('cpu-hand-1')]
+    player: [document.getElementById('player-hand-0'), document.getElementById('player-hand-1'), document.getElementById('player-hand-2')],
+    cpu: [document.getElementById('cpu-hand-0'), document.getElementById('cpu-hand-1'), document.getElementById('cpu-hand-2')]
 };
 const domCenters = [document.getElementById('center-0'), document.getElementById('center-1')];
 
@@ -72,17 +72,12 @@ function createColorDecks() {
         }
     }
     
-    const offset = Math.floor(Math.random() * 13);
-    const noiseLevel = 4; // ノイズを大幅に下げる(12→4)ことで、片方だけが大幅な「手札事故」を起こして詰むのを防止し、よりシーケンシャルにする
-
     const applyBias = (deck) => {
-        deck.forEach(card => {
-            let shifted = (card.rank + offset) % 13;
-            // 揺らぎ(noise)を持たせてソートする
-            card._sortWeight = shifted + (Math.random() * noiseLevel) + (Math.random() * 0.1);
-        });
-        deck.sort((a, b) => a._sortWeight - b._sortWeight);
-        deck.forEach(card => delete card._sortWeight);
+        // 手札が3枚になりカードが回りやすくなったため、完全ランダムなシャッフルに戻す
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
     };
     
     applyBias(redDeck);
@@ -123,8 +118,8 @@ function updateUI() {
     domCpuDeckCount.textContent = state.cpu.deck.length;
 
     // 手札の描画
-    [0, 1].forEach(i => renderStack(domHands.player[i], state.player.hand[i]));
-    [0, 1].forEach(i => renderStack(domHands.cpu[i], state.cpu.hand[i]));
+    [0, 1, 2].forEach(i => renderStack(domHands.player[i], state.player.hand[i]));
+    [0, 1, 2].forEach(i => renderStack(domHands.cpu[i], state.cpu.hand[i]));
 
     // 場の描画
     [0, 1].forEach(i => renderStack(domCenters[i], state.center[i], true)); // 中央は一番上だけ見えれば十分だが、スタック表現を入れるなら入れる
@@ -165,7 +160,7 @@ async function fillHandSlot(playerKey, slotIdx) {
     
     // スライド先の候補（既に同じ数字があるスロット）を探す
     let matchedOtherIdx = -1;
-    for (let i of [0, 1]) {
+    for (let i of [0, 1, 2]) {
         if (i === slotIdx) continue;
         let oStack = pState.hand[i];
         if (oStack.length > 0 && oStack[oStack.length - 1].rank === card.rank) {
@@ -341,7 +336,7 @@ function hasPlayableCard(playerKey) {
     for (let cIdx = 0; cIdx <= 1; cIdx++) {
         if (state.center[cIdx].length === 0) continue;
         const cRank = state.center[cIdx][state.center[cIdx].length - 1].rank;
-        for (let hIdx = 0; hIdx <= 1; hIdx++) {
+        for (let hIdx = 0; hIdx <= 2; hIdx++) {
             if (pState.hand[hIdx].length > 0) {
                 const hRank = pState.hand[hIdx][pState.hand[hIdx].length - 1].rank;
                 if (canPlay(hRank, cRank)) return true;
@@ -416,7 +411,7 @@ function resolveStuck() {
 
     updateUI();
     // 補充した結果、手札が空で補充できるならする
-    [0, 1].forEach(i => {
+    [0, 1, 2].forEach(i => {
         if(state.player.hand[i].length === 0) fillHandSlot('player', i);
         if(state.cpu.hand[i].length === 0) fillHandSlot('cpu', i);
     });
@@ -456,7 +451,7 @@ function cpuAction() {
     // 行動
     if (Date.now() >= state.cpu.penaltyUntil) {
         // ランダムに行動をチェック
-        let checkOrder = [0, 1];
+        let checkOrder = [0, 1, 2];
         // Fisher-Yates shuffle
         for (let k = checkOrder.length - 1; k > 0; k--) {
             const j = Math.floor(Math.random() * (k + 1));
@@ -541,12 +536,12 @@ function initGame() {
         state.cpu.deck = decks.red;
     }
     
-    state.cpu.hand = [[], []];
-    state.player.hand = [[], []];
+    state.cpu.hand = [[], [], []];
+    state.player.hand = [[], [], []];
     state.center = [[], []];
     
-    state.cpu.isDrawing = [false, false];
-    state.player.isDrawing = [false, false];
+    state.cpu.isDrawing = [false, false, false];
+    state.player.isDrawing = [false, false, false];
     state.cpu.penaltyUntil = 0;
     state.player.penaltyUntil = 0;
     
@@ -557,9 +552,9 @@ function initGame() {
     state.center[0].push(state.player.deck.pop());
     state.center[1].push(state.cpu.deck.pop());
 
-    // 手札を2枚ずつにする（重ね補充ルール込み）
-    [0, 1].forEach(i => fillHandSlot('player', i));
-    [0, 1].forEach(i => fillHandSlot('cpu', i));
+    // 手札を3枚ずつにする（重ね補充ルール込み）
+    [0, 1, 2].forEach(i => fillHandSlot('player', i));
+    [0, 1, 2].forEach(i => fillHandSlot('cpu', i));
 
     updateUI();
 }
@@ -659,8 +654,10 @@ btnBack.addEventListener('click', () => {
 
 domHands.player[0].addEventListener('click', () => playCard('player', 0));
 domHands.player[1].addEventListener('click', () => playCard('player', 1));
+domHands.player[2].addEventListener('click', () => playCard('player', 2));
 domHands.player[0].addEventListener('touchstart', (e) => { e.preventDefault(); playCard('player', 0); }, {passive: false});
 domHands.player[1].addEventListener('touchstart', (e) => { e.preventDefault(); playCard('player', 1); }, {passive: false});
+domHands.player[2].addEventListener('touchstart', (e) => { e.preventDefault(); playCard('player', 2); }, {passive: false});
 
 // 初回ロード
 switchScreen('start');
